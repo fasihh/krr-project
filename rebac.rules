@@ -1,0 +1,138 @@
+# ReBAC (Relationship-Based Access Control) Rules
+# Based on OpenFGA authorization model for Guild/Role system
+
+@prefix rebac: <http://example.org/rebac#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Guild: moderator includes owner
+[guildModeratorFromOwner:
+    (?guild rebac:owner ?user)
+    ->
+    (?guild rebac:moderator ?user)
+]
+
+# Guild: can_manage_roles includes moderator
+[guildCanManageRolesFromModerator:
+    (?guild rebac:moderator ?user)
+    ->
+    (?guild rebac:can_manage_roles ?user)
+]
+
+# Guild: can_manage_roles from role grants
+[guildCanManageRolesFromRoleGrant:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_manage_roles "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_manage_roles ?user)
+]
+
+# Guild: can_manage_permissions includes can_manage_roles
+[guildCanManagePermissionsFromRoles:
+    (?guild rebac:can_manage_roles ?user)
+    ->
+    (?guild rebac:can_manage_permissions ?user)
+]
+
+# Guild: can_manage_permissions also from role's has_role
+[guildCanManagePermissionsFromRoleHasRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_manage_permissions "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_manage_permissions ?user)
+]
+
+# Guild: can_manage_channels from can_manage_permissions
+[guildCanManageChannelsFromPermissions:
+    (?guild rebac:can_manage_permissions ?user)
+    ->
+    (?guild rebac:can_manage_channels ?user)
+]
+
+# Guild: can_manage_channels also from role
+[guildCanManageChannelsFromRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_manage_channels "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_manage_channels ?user)
+]
+
+# Guild: can_kick_members from can_manage_permissions
+[guildCanKickFromPermissions:
+    (?guild rebac:can_manage_permissions ?user)
+    ->
+    (?guild rebac:can_kick_members ?user)
+]
+
+# Guild: can_kick_members also from role
+[guildCanKickFromRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_kick_members "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_kick_members ?user)
+]
+
+# Guild: can_ban_members from can_manage_permissions
+[guildCanBanFromPermissions:
+    (?guild rebac:can_manage_permissions ?user)
+    ->
+    (?guild rebac:can_ban_members ?user)
+]
+
+# Guild: can_ban_members also from role
+[guildCanBanFromRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_ban_members "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_ban_members ?user)
+]
+
+# Guild: can_add_members from moderator
+[guildCanAddMembersFromModerator:
+    (?guild rebac:moderator ?user)
+    ->
+    (?guild rebac:can_add_members ?user)
+]
+
+# Guild: can_add_members also from role
+[guildCanAddMembersFromRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_add_members "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_add_members ?user)
+]
+
+# Guild: can_change_owner only from owner
+[guildCanChangeOwnerFromOwner:
+    (?guild rebac:owner ?user)
+    ->
+    (?guild rebac:can_change_owner ?user)
+]
+
+# Guild: can_message from member
+[guildCanMessageFromMember:
+    (?guild rebac:member ?user)
+    ->
+    (?guild rebac:can_message ?user)
+]
+
+# Guild: can_message from moderator
+[guildCanMessageFromModerator:
+    (?guild rebac:moderator ?user)
+    ->
+    (?guild rebac:can_message ?user)
+]
+
+# Guild: can_message also from role
+[guildCanMessageFromRole:
+    (?guild rebac:has_role ?role)
+    (?role rebac:has_role ?user)
+    (?role rebac:grants_message "true"^^xsd:boolean)
+    ->
+    (?guild rebac:can_message ?user)
+]

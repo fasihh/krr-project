@@ -1,0 +1,9 @@
+[project]
+name = "krr-project"
+version = "0.1.0"
+description = "OpenFGA inspired rule based engine"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32.5",
+]

@@ -1,0 +1,32 @@
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix ja:     <http://jena.hpl.hp.com/2005/11/Assembler#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix tdb2:   <http://jena.apache.org/2016/tdb#> .
+
+[] rdf:type fuseki:Server ;
+   fuseki:services ( <#service1> ) .
+
+<#service1> rdf:type fuseki:Service ;
+    fuseki:name   "rebac" ;          # endpoints under /rebac
+    fuseki:endpoint [ fuseki:operation fuseki:query  ; fuseki:name "query" ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:update ; fuseki:name "update" ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:gsp_r  ; fuseki:name "get" ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:gsp_rw ; fuseki:name "data" ] ;
+    fuseki:dataset <#dataset1> ;
+  .
+
+<#dataset1> rdf:type ja:RDFDataset ;
+  ja:defaultGraph <#infGraph> ;
+  .
+
+<#infGraph> rdf:type ja:InfModel ;
+  ja:reasoner [
+       ja:reasonerURL <http://jena.hpl.hp.com/2003/GenericRuleReasoner> ;
+       ja:rulesFrom <file:/fuseki/rebac.rules>
+    ] ;
+  ja:baseModel <#baseModel> ;
+  .
+
+<#baseModel> rdf:type tdb2:GraphTDB2 ;
+  tdb2:location "/fuseki/databases/tdb" ;
+  .
