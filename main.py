@@ -72,7 +72,7 @@ def clear_all_data():
 
 def create_user(ctx: TestContext, user_key: str, name: str):
     """Create a user"""
-    user_id = f"user_{user_key.lower()}"
+    user_id = f"user_{user_key}"
     ctx.users[user_key] = User(user_id=user_id, name=name)
     
     update = f"""
@@ -88,7 +88,7 @@ def create_user(ctx: TestContext, user_key: str, name: str):
 
 def create_guild(ctx: TestContext, guild_key: str, name: str, owner_key: str):
     """Create a guild with an owner"""
-    guild_id = f"guild_{guild_key.lower()}"
+    guild_id = f"guild_{guild_key}"
     owner = ctx.users[owner_key]
     ctx.guilds[guild_key] = Guild(guild_id=guild_id, name=name, owner_id=owner.user_id)
     
@@ -119,7 +119,7 @@ def add_member(ctx: TestContext, guild_id: str, member_key: str):
 
 def create_role(ctx: TestContext, guild_id: str, role_name: str, permissions: List[str]):
     """Create a role in a guild with specified permissions"""
-    role_id = f"role_{role_name.lower().replace(' ', '_')}"
+    role_id = f"role_{role_name.replace(' ', '_')}"
     ctx.created_roles.append(role_name)
     
     # Map permission names to grant properties
@@ -162,7 +162,7 @@ def create_role(ctx: TestContext, guild_id: str, role_name: str, permissions: Li
 def assign_role(ctx: TestContext, guild_id: str, member_key: str, role_name: str):
     """Assign a role to a member"""
     member = ctx.users[member_key]
-    role_id = f"role_{role_name.lower().replace(' ', '_')}"
+    role_id = f"role_{role_name.replace(' ', '_')}"
     
     # Check if this is an Admin role (which grants moderator status)
     # Query the role to see if it was created with 'moderator' permission
@@ -197,7 +197,7 @@ def assign_role(ctx: TestContext, guild_id: str, member_key: str, role_name: str
 def remove_role(ctx: TestContext, guild_id: str, member_key: str, role_name: str):
     """Remove a role from a member"""
     member = ctx.users[member_key]
-    role_id = f"role_{role_name.lower().replace(' ', '_')}"
+    role_id = f"role_{role_name.replace(' ', '_')}"
     
     # If removing Admin role, also remove moderator status
     is_moderator_role = role_name == 'Admin'
