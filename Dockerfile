@@ -47,8 +47,9 @@ RUN apk add --no-cache curl binutils
 WORKDIR $FUSEKI_DIR
 
 ## -- Download the jar file.
+
 COPY download.sh .
-RUN chmod a+x download.sh
+RUN sed -i 's/\r$//' download.sh && chmod a+x download.sh
 
 # Download, with check of the SHA1 checksum.
 RUN ./download.sh --chksum sha1 "$JAR_URL"
