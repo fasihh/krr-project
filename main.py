@@ -66,12 +66,11 @@ def clear_all_data():
     # Clear SQLite
     db.clear_all_data()
 
-def create_user(user_key: str, name: str) -> bool:
+def create_user(user_id: str) -> bool:
     """Create a user in both SQLite and Fuseki"""
-    user_id = f"user_{user_key}"
     
-    if not db.save_user(user_key, user_id, name):
-        print(f"User {user_key} already exists in database")
+    if not db.save_user(user_id):
+        print(f"User {user_id} already exists in database")
         return False
     
     # Save to Fuseki
@@ -80,26 +79,24 @@ def create_user(user_key: str, name: str) -> bool:
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     
     INSERT DATA {{
-        rebac:{user_id} rdf:type rebac:User ;
-            rebac:name "{name}" .
+        rebac:user_{user_id} rdf:type rebac:User ;
     }}
     """
     return execute_update(update, silent=True)
 
-def create_guild(guild_key: str, name: str, owner_key: str) -> bool:
+def create_guild(guild_id: str, owner_id: str) -> bool:
     """Create a guild with an owner in both SQLite and Fuseki"""
-    guild_id = f"guild_{guild_key}"
     
     # Get owner from database
-    user_data = db.get_user(owner_key)
+    user_data = db.get_user(owner_id)
     if not user_data:
-        print(f"Owner {owner_key} not found")
+        print(f"Owner {owner_id} not found")
         return False
     
     owner_id = user_data['user_id']
     
-    if not db.save_guild(guild_key, guild_id, name, owner_id):
-        print(f"Guild {guild_key} already exists in database")
+    if not db.save_guild(guild_id, owner_id):
+        print(f"Guild {guild_id} already exists in database")
         return False
     
     # Save to Fuseki
@@ -108,54 +105,120 @@ def create_guild(guild_key: str, name: str, owner_key: str) -> bool:
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     
     INSERT DATA {{
-        rebac:{guild_id} rdf:type rebac:Guild ;
-            rebac:name "{name}" ;
-            rebac:owner rebac:{owner_id} .
+        rebac:guild_{guild_id} rdf:type rebac:Guild ;
+            rebac:owner rebac:user_{owner_id} .
     }}
     """
     return execute_update(update, silent=True)
 
-def add_member(guild_id: str, member_key: str) -> bool:
-    """Add a member to a guild"""
-    user_data = db.get_user(member_key)
-    if not user_data:
-        print(f"User {member_key} not found")
+def delete_guild(guild_id: str) -> bool:
+    """Delete a guild from both SQLite and Fuseki"""
+    
+    # Delete all roles for this guild first
+    db.delete_guild_roles(guild_id)
+    
+    # Delete the guild
+    if not db.delete_guild(guild_id):
+        print(f"Guild {guild_id} not found in database")
         return False
     
-    member_id = user_data['user_id']
+    # Delete all related triples in Fuseki (same as above)
+    update = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    
+    DELETE {{
+        rebac:guild_{guild_id} ?p ?o .
+        ?s ?p2 rebac:guild_{guild_id} .
+        ?role ?rp ?ro .
+    }}
+    WHERE {{
+        {{
+            rebac:guild_{guild_id} ?p ?o .
+        }}
+        UNION
+        {{
+            ?s ?p2 rebac:guild_{guild_id} .
+        }}
+        UNION
+        {{
+            ?role rebac:parent rebac:guild_{guild_id} .
+            ?role ?rp ?ro .
+        }}
+    }}
+    """
+    return execute_update(update, silent=True)
+
+def add_member(guild_id: str, member_id: str, role_id: str) -> bool:
+    """Add a member to a guild"""
+    user_data = db.get_user(member_id)
+    if not user_data:
+        print(f"User {member_id} not found")
+        return False
     
     update = f"""
     PREFIX rebac: <http://example.org/rebac#>
     
     INSERT DATA {{
-        rebac:{guild_id} rebac:member rebac:{member_id} .
+        rebac:guild_{guild_id} rebac:member rebac:user_{member_id} .
     }}
     """
+    execute_update(update, silent=True)
+
+    return assign_role(guild_id, member_id, role_id)
+    
+
+def remove_member_from_guild(guild_id: str, member_id: str, role_ids: list[str]) -> bool:
+    """Remove a member from a guild"""
+    user_data = db.get_user(member_id)
+    if not user_data:
+        print(f"User {member_id} not found")
+        return False
+
+    update = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    
+    DELETE {{
+        rebac:guild_{guild_id} rebac:member rebac:user_{member_id} .
+        rebac:guild_{guild_id} rebac:moderator rebac:user_{member_id} .
+    }}
+    WHERE {{
+        rebac:guild_{guild_id} rebac:member rebac:user_{member_id} .
+        OPTIONAL {{ rebac:guild_{guild_id} rebac:moderator rebac:user_{member_id} . }}
+    }}
+    """
+    
+    for role_id in role_ids:
+        remove_role_from_member(guild_id, member_id, role_id)
+
     return execute_update(update, silent=True)
 
-def create_role(guild_id: str, role_name: str, permissions: list[str]) -> str:
+def create_role(guild_id: str, role_id: str, permissions: list[str]) -> str:
     """Create a role in a guild with specified permissions"""
-    role_id = f"role_{role_name.replace(' ', '_')}"
     
-    db.save_role(role_id, role_name, guild_id)
+    db.save_role(role_id, guild_id)
     
     grant_statements = []
-    if 'moderator' in permissions:
-        pass
-    if 'can_manage_permissions' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_manage_permissions true .")
-    if 'can_manage_channels' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_manage_channels true .")
-    if 'can_kick_members' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_kick_members true .")
-    if 'can_ban_members' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_ban_members true .")
-    if 'can_add_members' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_add_members true .")
-    if 'can_message' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_message true .")
-    if 'can_manage_roles' in permissions:
-        grant_statements.append(f"rebac:{role_id} rebac:grants_manage_roles true .")
+    
+    # Check if moderator permission is included
+    is_moderator = 'moderator' in permissions
+    
+    if is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_moderator true .")
+    
+    if 'can_manage_permissions' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_manage_permissions true .")
+    if 'can_manage_channels' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_manage_channels true .")
+    if 'can_kick_members' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_kick_members true .")
+    if 'can_ban_members' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_ban_members true .")
+    if 'can_add_members' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_add_members true .")
+    if 'can_message' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_message true .")
+    if 'can_manage_roles' in permissions or is_moderator:
+        grant_statements.append(f"rebac:role_{role_id} rebac:grants_manage_roles true .")
     
     grants = "\n        ".join(grant_statements) if grant_statements else ""
     
@@ -164,34 +227,39 @@ def create_role(guild_id: str, role_name: str, permissions: list[str]) -> str:
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     
     INSERT DATA {{
-        rebac:{role_id} rdf:type rebac:Role ;
-            rebac:name "{role_name}" ;
-            rebac:parent rebac:{guild_id} .
+        rebac:role_{role_id} rdf:type rebac:Role ;
+            rebac:parent rebac:guild_{guild_id} .
         {grants}
-        rebac:{guild_id} rebac:has_role rebac:{role_id} .
+        rebac:guild_{guild_id} rebac:has_role rebac:role_{role_id} .
     }}
     """
     execute_update(update, silent=True)
     return role_id
 
-def assign_role(guild_id: str, member_key: str, role_name: str) -> bool:
+def assign_role(guild_id: str, member_id: str, role_id: str) -> bool:
     """Assign a role to a member"""
-    user_data = db.get_user(member_key)
+    user_data = db.get_user(member_id)
     if not user_data:
-        print(f"User {member_key} not found")
+        print(f"User {member_id} not found")
         return False
     
-    member_id = user_data['user_id']
-    role_id = f"role_{role_name.replace(' ', '_')}"
+    # Check if this role grants moderator permission by querying Fuseki
+    check_moderator = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    ASK {{
+        rebac:role_{role_id} rebac:grants_moderator true .
+    }}
+    """
+    result = execute_query(check_moderator)
+    is_moderator_role = result.get('boolean', False) if result else False
     
-    is_moderator_role = role_name == 'Admin' 
     if is_moderator_role:
         update = f"""
         PREFIX rebac: <http://example.org/rebac#>
         
         INSERT DATA {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
-            rebac:{guild_id} rebac:moderator rebac:{member_id} .
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
+            rebac:guild_{guild_id} rebac:moderator rebac:user_{member_id} .
         }}
         """
     else:
@@ -199,33 +267,52 @@ def assign_role(guild_id: str, member_key: str, role_name: str) -> bool:
         PREFIX rebac: <http://example.org/rebac#>
         
         INSERT DATA {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
         }}
         """
     return execute_update(update, silent=True)
 
-def remove_role(guild_id: str, member_key: str, role_name: str) -> bool:
+def delete_role(role_id: str, guild_id: str) -> bool:
+    """Delete a role from both SQLite and Fuseki"""
+    db.delete_role(role_id)
+    
+    update = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    
+    DELETE WHERE {{
+        rebac:role_{role_id} ?p ?o .
+        rebac:guild_{guild_id} rebac:has_role rebac:role_{role_id} .
+    }}
+    """
+    return execute_update(update, silent=True)
+
+def remove_role_from_member(guild_id: str, member_id: str, role_id: str) -> bool:
     """Remove a role from a member"""
-    user_data = db.get_user(member_key)
+    user_data = db.get_user(member_id)
     if not user_data:
-        print(f"User {member_key} not found")
+        print(f"User {member_id} not found")
         return False
     
-    member_id = user_data['user_id']
-    role_id = f"role_{role_name.replace(' ', '_')}"
-    
-    is_moderator_role = role_name == 'Admin'
+    check_moderator = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    ASK {{
+        rebac:role_{role_id} rebac:grants_moderator true .
+    }}
+    """
+    result = execute_query(check_moderator)
+    is_moderator_role = result.get('boolean', False) if result else False
+
     if is_moderator_role:
         update = f"""
         PREFIX rebac: <http://example.org/rebac#>
         
         DELETE {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
-            rebac:{guild_id} rebac:moderator rebac:{member_id} .
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
+            rebac:guild_{guild_id} rebac:moderator rebac:user_{member_id} .
         }}
         WHERE {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
-            OPTIONAL {{ rebac:{guild_id} rebac:moderator rebac:{member_id} . }}
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
+            OPTIONAL {{ rebac:guild_{guild_id} rebac:moderator rebac:user_{member_id} . }}
         }}
         """
     else:
@@ -233,22 +320,20 @@ def remove_role(guild_id: str, member_key: str, role_name: str) -> bool:
         PREFIX rebac: <http://example.org/rebac#>
         
         DELETE {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
         }}
         WHERE {{
-            rebac:{role_id} rebac:has_role rebac:{member_id} .
+            rebac:role_{role_id} rebac:has_role rebac:user_{member_id} .
         }}
         """
     return execute_update(update, silent=True)
 
-def change_owner(guild_id: str, new_owner_key: str) -> bool:
+def change_owner(guild_id: str, new_owner_id: str) -> bool:
     """Change guild ownership"""
-    user_data = db.get_user(new_owner_key)
+    user_data = db.get_user(new_owner_id)
     if not user_data:
-        print(f"User {new_owner_key} not found")
+        print(f"User {new_owner_id} not found")
         return False
-    
-    new_owner_id = user_data['user_id']
     
     db.update_guild_owner(guild_id, new_owner_id)
     
@@ -257,31 +342,45 @@ def change_owner(guild_id: str, new_owner_key: str) -> bool:
     PREFIX rebac: <http://example.org/rebac#>
     
     DELETE {{
-        rebac:{guild_id} rebac:owner ?old_owner .
+        rebac:guild_{guild_id} rebac:owner ?old_owner .
     }}
     INSERT {{
-        rebac:{guild_id} rebac:owner rebac:{new_owner_id} .
+        rebac:guild_{guild_id} rebac:owner rebac:user_{new_owner_id} .
     }}
     WHERE {{
-        rebac:{guild_id} rebac:owner ?old_owner .
+        rebac:guild_{guild_id} rebac:owner ?old_owner .
     }}
     """
     return execute_update(update, silent=True)
 
-def check_permission(user_key: str, guild_id: str, relation: str) -> bool:
+def check_permission(user_id: str, guild_id: str, relation: str) -> bool:
     """Check if a user has a specific permission on a guild"""
-    user_data = db.get_user(user_key)
+    user_data = db.get_user(user_id)
     if not user_data:
-        print(f"User {user_key} not found")
+        print(f"User {user_id} not found")
         return False
-    
-    user_id = user_data['user_id']
     
     query = f"""
     PREFIX rebac: <http://example.org/rebac#>
     
     ASK {{
-        rebac:{guild_id} rebac:{relation} rebac:{user_id} .
+        rebac:guild_{guild_id} rebac:{relation} rebac:user_{user_id} .
+    }}
+    """
+    
+    result = execute_query(query)
+    if result:
+        return result.get('boolean', False)
+    return False
+
+def check_role_permission(role_id: str, relation: str, guild_id: str) -> bool:
+    """Check if a role grants a specific permission"""
+    query = f"""
+    PREFIX rebac: <http://example.org/rebac#>
+    
+    ASK {{
+        rebac:role_{role_id} rebac:parent rebac:guild_{guild_id} ;
+                            rebac:grants_{relation} true .
     }}
     """
     
