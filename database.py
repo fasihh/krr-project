@@ -19,9 +19,7 @@ def init_db():
     # Users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            user_key TEXT PRIMARY KEY,
-            user_id TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
+            user_id TEXT PRIMARY KEY,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -29,9 +27,7 @@ def init_db():
     # Guilds table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS guilds (
-            guild_key TEXT PRIMARY KEY,
-            guild_id TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
+            guild_id TEXT PRIMARY KEY,
             owner_id TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_id) REFERENCES users(user_id)
@@ -42,7 +38,6 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS roles (
             role_id TEXT PRIMARY KEY,
-            role_name TEXT NOT NULL,
             guild_id TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
@@ -67,26 +62,26 @@ def get_db():
         conn.close()
 
 # User operations
-def save_user(user_key: str, user_id: str, name: str) -> bool:
+def save_user(user_id: str) -> bool:
     """Save a user to the database"""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO users (user_key, user_id, name) VALUES (?, ?, ?)",
-                (user_key, user_id, name)
+                "INSERT INTO users (user_id) VALUES (?)",
+                (user_id,)
             )
         return True
     except sqlite3.IntegrityError:
         return False
 
-def get_user(user_key: str) -> Optional[Dict[str, str]]:
-    """Get a user by key"""
+def get_user(user_id: str) -> Optional[Dict[str, str]]:
+    """Get a user by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT user_key, user_id, name FROM users WHERE user_key = ?",
-            (user_key,)
+            "SELECT user_id FROM users WHERE user_id = ?",
+            (user_id,)
         )
         row = cursor.fetchone()
         if row:
@@ -97,37 +92,37 @@ def get_all_users() -> List[Dict[str, str]]:
     """Get all users"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_key, user_id, name FROM users")
+        cursor.execute("SELECT user_id FROM users")
         return [dict(row) for row in cursor.fetchall()]
 
-def delete_user(user_key: str) -> bool:
+def delete_user(user_id: str) -> bool:
     """Delete a user"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM users WHERE user_key = ?", (user_key,))
+        cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
         return cursor.rowcount > 0
 
 # Guild operations
-def save_guild(guild_key: str, guild_id: str, name: str, owner_id: str) -> bool:
+def save_guild(guild_id: str, owner_id: str) -> bool:
     """Save a guild to the database"""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO guilds (guild_key, guild_id, name, owner_id) VALUES (?, ?, ?, ?)",
-                (guild_key, guild_id, name, owner_id)
+                "INSERT INTO guilds (guild_id, owner_id) VALUES (?, ?)",
+                (guild_id, owner_id)
             )
         return True
     except sqlite3.IntegrityError:
         return False
 
-def get_guild(guild_key: str) -> Optional[Dict[str, str]]:
-    """Get a guild by key"""
+def get_guild(guild_id: str) -> Optional[Dict[str, str]]:
+    """Get a guild by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT guild_key, guild_id, name, owner_id FROM guilds WHERE guild_key = ?",
-            (guild_key,)
+            "SELECT guild_id, owner_id FROM guilds WHERE guild_id = ?",
+            (guild_id,)
         )
         row = cursor.fetchone()
         if row:
@@ -138,7 +133,7 @@ def get_all_guilds() -> List[Dict[str, str]]:
     """Get all guilds"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT guild_key, guild_id, name, owner_id FROM guilds")
+        cursor.execute("SELECT guild_id, owner_id FROM guilds")
         return [dict(row) for row in cursor.fetchall()]
 
 def update_guild_owner(guild_id: str, new_owner_id: str) -> bool:
@@ -151,22 +146,22 @@ def update_guild_owner(guild_id: str, new_owner_id: str) -> bool:
         )
         return cursor.rowcount > 0
 
-def delete_guild(guild_key: str) -> bool:
+def delete_guild(guild_id: str) -> bool:
     """Delete a guild"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM guilds WHERE guild_key = ?", (guild_key,))
+        cursor.execute("DELETE FROM guilds WHERE guild_id = ?", (guild_id,))
         return cursor.rowcount > 0
 
 # Role operations
-def save_role(role_id: str, role_name: str, guild_id: str) -> bool:
+def save_role(role_id: str, guild_id: str) -> bool:
     """Save a role to the database"""
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO roles (role_id, role_name, guild_id) VALUES (?, ?, ?)",
-                (role_id, role_name, guild_id)
+                "INSERT INTO roles (role_id, guild_id) VALUES (?, ?)",
+                (role_id, guild_id)
             )
         return True
     except sqlite3.IntegrityError:
@@ -177,7 +172,7 @@ def get_role(role_id: str) -> Optional[Dict[str, str]]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT role_id, role_name, guild_id FROM roles WHERE role_id = ?",
+            "SELECT role_id, guild_id FROM roles WHERE role_id = ?",
             (role_id,)
         )
         row = cursor.fetchone()
@@ -190,10 +185,17 @@ def get_guild_roles(guild_id: str) -> List[Dict[str, str]]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT role_id, role_name, guild_id FROM roles WHERE guild_id = ?",
+            "SELECT role_id, guild_id FROM roles WHERE guild_id = ?",
             (guild_id,)
         )
         return [dict(row) for row in cursor.fetchall()]
+
+def delete_guild_roles(guild_id: str) -> bool:
+    """Delete all roles for a guild"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM roles WHERE guild_id = ?", (guild_id,))
+        return cursor.rowcount > 0
 
 # Database management
 def clear_all_data():
