@@ -9,6 +9,36 @@
 OpenFGA inspired rule based engine created for KRR Project.
 
 ### Instructions
-1) Build: `docker-compose build --build-arg JENA_VERSION=5.6.0`
+1) Install dependencies: `uv sync`
 
-2) Run: `docker-compose up -d`
+2) Build Fuseki server: `docker-compose build --build-arg JENA_VERSION=5.6.0`
+
+3) Run Fuseki server: `docker-compose up -d`
+
+4) Run service: `uv run api.py`
+
+### Comparison with OpenFGA rules
+```
+model
+  schema 1.1
+
+type user
+
+type guild
+  relations
+    define owner: [user]
+    define moderator: [user] or owner
+    define member: [user]
+    
+    # Guild permissions (some granted to roles)
+    define can_ban_members: [role#has_role] or can_manage_permissions
+    define can_kick_members: [role#has_role] or can_manage_permissions
+    define can_manage_channels: [role#has_role] or can_manage_permissions
+    define can_manage_permissions: [role#has_role] or can_manage_roles
+    define can_manage_roles: [role#has_role] or moderator
+
+type role
+  relations
+    define parent: [guild]        # which guild it belongs to
+    define has_role: [user]         # who has this role
+```
