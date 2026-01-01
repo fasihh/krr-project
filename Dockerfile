@@ -84,6 +84,7 @@ ARG FUSEKI_JAR
 
 COPY --from=base /opt/java-minimal /opt/java-minimal
 COPY --from=base /fuseki /fuseki
+COPY --from=base /fuseki/entrypoint.sh /fuseki/entrypoint.sh
 
 WORKDIR $FUSEKI_DIR
 
