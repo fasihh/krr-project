@@ -1,9 +1,3 @@
-"""
-Test ReBAC (Relationship-Based Access Control) with Fuseki
-Based on OpenFGA Guild/Role authorization model
-Ported from TypeScript test suite
-"""
-
 from typing import Dict, Optional, Callable
 from dataclasses import dataclass
 

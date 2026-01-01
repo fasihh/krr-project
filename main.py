@@ -1,10 +1,3 @@
-"""
-ReBAC (Relationship-Based Access Control) with Fuseki
-Based on OpenFGA Guild/Role authorization model
-Core functions for user, guild, role, and permission management
-Now with SQLite for persistent storage
-"""
-
 import requests
 from typing import Optional
 from dataclasses import dataclass
